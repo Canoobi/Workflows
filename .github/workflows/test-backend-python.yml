@@ -1,0 +1,36 @@
+name: Test Backend
+
+on:
+  workflow_call:
+    inputs:
+      backend_directory:
+        required: true
+        type: string
+      coverage_source:
+        required: false
+        type: string
+        default: '.'
+      coverage_omit:
+        required: false
+        type: string
+        default: '*/migrations/*'
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Run tests with coverage
+        run: |
+          cd ${{ inputs.backend_directory }}
+          pip install -r requirements.txt
+          coverage run --source='${{ inputs.coverage_source }}' manage.py test
+          coverage report --omit="${{ inputs.coverage_omit }}"

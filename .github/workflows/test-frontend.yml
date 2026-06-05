@@ -1,0 +1,36 @@
+name: Test Frontend
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        required: false
+        type: string
+        default: '22'
+      frontend_directory:
+        required: false
+        type: string
+        default: Frontend
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.frontend_directory }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ inputs.frontend_directory }}
+
+      - name: Run tests with coverage
+        run: npm run test -- --watch=false --browsers=ChromeHeadless --no-progress
+        working-directory: ${{ inputs.frontend_directory }}

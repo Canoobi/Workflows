@@ -1,0 +1,27 @@
+name: Lint Python
+
+on:
+  workflow_call:
+    inputs:
+      lint_path:
+        required: true
+        type: string
+
+jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Scan code
+        run: ruff check ${{ inputs.lint_path }}
