@@ -3,10 +3,6 @@ name: Trigger Deploy
 on:
   workflow_call:
     inputs:
-      repo_path:
-        required: true
-        type: string
-
       container_names:
         required: false
         type: string
@@ -39,6 +35,8 @@ on:
 
     secrets:
       WORKFLOWS_REPO_TOKEN:
+        required: true
+      REPO_PATH:
         required: true
 
 jobs:
