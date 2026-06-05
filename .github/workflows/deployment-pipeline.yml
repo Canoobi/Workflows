@@ -1,0 +1,147 @@
+name: Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      actor:
+        required: true
+        type: string
+        description: ""
+
+      repo_path:
+        required: true
+        type: string
+        description: ""
+
+      container_names:
+        required: false
+        type: string
+        default: ""
+        description: ""
+
+      run_pull_changes:
+        required: false
+        type: boolean
+        default: true
+        description: ""
+
+      run_stop_compose_containers:
+        required: false
+        type: boolean
+        default: false
+        description: ""
+
+      run_build_docker_compose_file:
+        required: false
+        type: boolean
+        default: false
+        description: ""
+
+      run_start_compose_containers:
+        required: false
+        type: boolean
+        default: false
+        description: ""
+
+      run_restart_non_compose_containers:
+        required: false
+        type: boolean
+        default: false
+        description: ""
+
+jobs:
+  check-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check authorization
+        run: |
+          ADMIN_USERS="${{ secrets.ADMIN_USERS }}"
+
+          if [[ ! " $ADMIN_USERS " =~ " ${{ inputs.actor }} " ]]; then
+            echo "User ${{ inputs.actor }} is not authorized to run this workflow."
+            exit 1
+          fi
+
+  deploy-changes:
+    if: ${{ inputs.run_pull_changes }}
+    needs:
+      - check-authorization
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull from Git
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          script: |
+            cd "${{ inputs.repo_path }}"
+            /opt/bin/git pull
+
+  stop-compose-containers:
+    if: ${{ inputs.run_stop_compose_containers }}
+    needs:
+      - check-authorization
+      - deploy-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop compose containers
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          script: |
+            cd "${{ inputs.repo_path }}"
+            echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose down
+
+  build-docker-compose-file:
+    if: ${{ inputs.run_build_docker_compose_file }}
+    needs:
+      - check-authorization
+      - deploy-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build docker image
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          script: |
+            cd "${{ inputs.repo_path }}"
+            echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose build
+
+  start-compose-containers:
+    if: ${{ inputs.run_start_compose_containers }}
+    needs:
+      - check-authorization
+      - deploy-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start compose containers
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          script: |
+            cd "${{ inputs.repo_path }}"
+            echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose up -d
+
+  restart-non-compose-containers:
+    if: ${{ inputs.run_restart_non_compose_containers && inputs.container_names != '' }}
+    needs:
+      - check-authorization
+      - deploy-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart non-compose containers
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          script: |
+            cd "${{ inputs.repo_path }}"
+            echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker restart ${{ inputs.container_names }}

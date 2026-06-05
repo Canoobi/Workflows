@@ -1,4 +1,0 @@
-name: restart-containers-compose.yml
-on:
-
-jobs:
