@@ -63,7 +63,12 @@ jobs:
           fi
 
   deploy-changes:
-    if: ${{ inputs.run_pull_changes }}
+    if: >-
+      ${{
+        inputs.run_pull_changes &&
+        always() &&
+        needs.check-authorization.result == 'success'
+      }}
     needs:
       - check-authorization
     runs-on: ubuntu-latest
@@ -79,7 +84,16 @@ jobs:
             /opt/bin/git pull
 
   stop-compose-containers:
-    if: ${{ inputs.run_stop_compose_containers }}
+    if: >-
+      ${{
+        inputs.run_stop_compose_containers &&
+        always() &&
+        needs.check-authorization.result == 'success' &&
+        (
+          !inputs.run_pull_changes ||
+          needs.deploy-changes.result == 'success'
+        )
+      }}
     needs:
       - check-authorization
       - deploy-changes
@@ -96,10 +110,24 @@ jobs:
             echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose down
 
   build-docker-compose-file:
-    if: ${{ inputs.run_build_docker_compose_file }}
+    if: >-
+      ${{
+        inputs.run_build_docker_compose_file &&
+        always() &&
+        needs.check-authorization.result == 'success' &&
+        (
+          !inputs.run_pull_changes ||
+          needs.deploy-changes.result == 'success'
+        ) &&
+        (
+          !inputs.run_stop_compose_containers ||
+          needs.stop-compose-containers.result == 'success'
+        )
+      }}
     needs:
       - check-authorization
       - deploy-changes
+      - stop-compose-containers
     runs-on: ubuntu-latest
     steps:
       - name: Build docker image
@@ -113,10 +141,29 @@ jobs:
             echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose build
 
   start-compose-containers:
-    if: ${{ inputs.run_start_compose_containers }}
+    if: >-
+      ${{
+        inputs.run_start_compose_containers &&
+        always() &&
+        needs.check-authorization.result == 'success' &&
+        (
+          !inputs.run_pull_changes ||
+          needs.deploy-changes.result == 'success'
+        ) &&
+        (
+          !inputs.run_stop_compose_containers ||
+          needs.stop-compose-containers.result == 'success'
+        ) &&
+        (
+          !inputs.run_build_docker_compose_file ||
+          needs.build-docker-compose-file.result == 'success'
+        )
+      }}
     needs:
       - check-authorization
       - deploy-changes
+      - stop-compose-containers
+      - build-docker-compose-file
     runs-on: ubuntu-latest
     steps:
       - name: Start compose containers
@@ -130,10 +177,35 @@ jobs:
             echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose up -d
 
   restart-non-compose-containers:
-    if: ${{ inputs.run_restart_non_compose_containers && inputs.container_names != '' }}
+    if: >-
+      ${{
+        inputs.run_restart_non_compose_containers &&
+        inputs.container_names != '' &&
+        always() &&
+        needs.check-authorization.result == 'success' &&
+        (
+          !inputs.run_pull_changes ||
+          needs.deploy-changes.result == 'success'
+        ) &&
+        (
+          !inputs.run_stop_compose_containers ||
+          needs.stop-compose-containers.result == 'success'
+        ) &&
+        (
+          !inputs.run_build_docker_compose_file ||
+          needs.build-docker-compose-file.result == 'success'
+        ) &&
+        (
+          !inputs.run_start_compose_containers ||
+          needs.start-compose-containers.result == 'success'
+        )
+      }}
     needs:
       - check-authorization
       - deploy-changes
+      - stop-compose-containers
+      - build-docker-compose-file
+      - start-compose-containers
     runs-on: ubuntu-latest
     steps:
       - name: Restart non-compose containers
