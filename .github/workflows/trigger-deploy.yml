@@ -42,6 +42,7 @@ on:
 jobs:
   trigger-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Trigger deployment pipeline
         id: trigger

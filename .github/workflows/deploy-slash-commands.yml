@@ -1,0 +1,16 @@
+name: Deploy Slash Commands
+
+on:
+  workflow_call:
+
+jobs:
+  deploy-global:
+    name: Deploying Slash Commands to all servers
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: node deploy-commands-global.js
