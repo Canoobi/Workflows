@@ -51,11 +51,12 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.WORKFLOWS_REPO_TOKEN }}" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
-            https://api.github.com/repos/Canoobi/Workflows/actions/workflows/deployment-pipeline.yml/dispatches \
+            https://api.github.com/repos/Canoobi/Workflows/actions/workflows/deployment.yml/dispatches \
             -d '{
               "ref": "main",
               "return_run_details": true,
               "inputs": {
+                "source_repository": "${{ github.repository }}",
                 "actor": "${{ github.actor }}",
                 "repo_path": "${{ secrets.REPO_PATH }}",
                 "container_names": "${{ inputs.container_names }}",

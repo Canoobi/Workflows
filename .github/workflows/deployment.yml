@@ -1,8 +1,14 @@
 name: Deployment Pipeline
+run-name: Deployment Pipeline ${{ inputs.source_repository }}
 
 on:
   workflow_dispatch:
     inputs:
+      source_repository:
+        required: true
+        type: string
+        description: ""
+
       actor:
         required: true
         type: string
