@@ -55,9 +55,6 @@ jobs:
               "ref": "main",
               "return_run_details": true,
               "inputs": {
-                "source_repository": "${{ github.repository }}",
-                "source_ref": "${{ github.ref_name }}",
-                "source_sha": "${{ github.sha }}",
                 "actor": "${{ github.actor }}",
                 "repo_path": "${{ secrets.REPO_PATH }}",
                 "container_names": "${{ inputs.container_names }}",
