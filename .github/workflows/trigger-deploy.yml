@@ -46,8 +46,7 @@ jobs:
       - name: Trigger deployment pipeline
         id: trigger
         run: |
-          RESPONSE=$(curl --fail-with-body -sS -L \
-            -X POST \
+          RESPONSE=$(curl -L \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.WORKFLOWS_REPO_TOKEN }}" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
@@ -107,7 +106,7 @@ jobs:
               exit 1
             fi
           
-            RESPONSE=$(curl --fail-with-body -sS -L \
+            RESPONSE=$(curl -L \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ secrets.WORKFLOWS_REPO_TOKEN }}" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
