@@ -6,17 +6,15 @@ Dieses Repository enthält eine Sammlung von **GitHub Actions Workflows** für a
 
 Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit folgenden GitHub Actions:
 
-| Workflow | Beschreibung |
-|----------|-------------|
-| **build-docker-compose-file.yml** | Erstellt Docker Compose Dateien |
-| **check-authorization.yml** | Validiert Autorisierungen und Berechtigungen |
-| **deploy-changes.yml** | Deployt Änderungen in der Produktionsumgebung |
-| **lint-python.yml** | Prüft Python Code auf Stilkonventionen |
+| Workflow | Beschreibung                                          |
+|----------|-------------------------------------------------------|
+| **lint-python.yml** | Prüft Python Code auf Stilkonventionen                |
 | **lint-typescript.yml** | Prüft TypeScript/JavaScript Code auf Stilkonventionen |
-| **restart-containers-compose.yml** | Startet Docker Container mit Compose neu |
-| **restart-containers-non-compose.yml** | Startet Docker Container ohne Compose neu |
-| **test-backend-python.yml** | Führt Backend-Tests (Python) aus |
-| **test-frontend.yml** | Führt Frontend-Tests aus |
+| **test-backend-python.yml** | Führt Backend-Tests (Python) aus                      |
+| **test-frontend.yml** | Führt Frontend-Tests aus                              |
+| **deployment.yml** | Führt Deployment aus                                  |
+| **deploy-slash-commands.yml** | Führt Deployment von Slash-Befehlen aus               |
+| **trigger-deploy.yml** | Startet den Deployment-Prozess                        |
 
 ## 🚀 Workflows
 
@@ -28,13 +26,10 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 - **Linting**: `lint-typescript.yml` - TypeScript/JavaScript Qualitätsprüfung
 - **Tests**: `test-frontend.yml` - Frontend-Test-Suite
 
-### Infrastruktur & Deployment
-- **Docker Build**: `build-docker-compose-file.yml` - Build von Docker Images
-- **Autorisierung**: `check-authorization.yml` - Berechtigungsprüfungen
-- **Deployment**: `deploy-changes.yml` - Production Deployment
-- **Container Management**: 
-  - `restart-containers-compose.yml`
-  - `restart-containers-non-compose.yml`
+### Deployment
+- **Deployment**: `deployment.yml` - Deployment-Prozess
+- **Deploy Slash-Commands**: `deploy-slash-commands.yml` - Deployment von Slash-Befehlen nach Discord
+- **Trigger Deploy**: `trigger-deploy.yml` - Startet den Deploy-Prozess
 
 ## 📁 Projektstruktur
 
@@ -42,15 +37,13 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 .
 ├── .github/
 │   └── workflows/              # GitHub Actions Workflows
-│       ├── build-docker-compose-file.yml
-│       ├── check-authorization.yml
-│       ├── deploy-changes.yml
 │       ├── lint-python.yml
 │       ├── lint-typescript.yml
-│       ├── restart-containers-compose.yml
-│       ├── restart-containers-non-compose.yml
 │       ├── test-backend-python.yml
-│       └── test-frontend.yml
+│       ├── test-frontend.yml
+│       ├── deployment.yml
+│       ├── deploy-slash-commands.yml
+│       └── trigger-deploy.yml
 ├── .gitignore
 └── README.md
 ```
