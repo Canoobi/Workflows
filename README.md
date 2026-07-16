@@ -10,6 +10,7 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 |----------|-------------------------------------------------------|
 | **lint-python.yml** | Prüft Python Code auf Stilkonventionen                |
 | **lint-typescript.yml** | Prüft TypeScript/JavaScript Code auf Stilkonventionen |
+| **test-app-android.yml** | Führt Android-App-Tests (Gradle) aus                  |
 | **test-backend-python.yml** | Führt Backend-Tests (Python) aus                      |
 | **test-frontend.yml** | Führt Frontend-Tests aus                              |
 | **deployment.yml** | Führt Deployment aus                                  |
@@ -26,6 +27,9 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 - **Linting**: `lint-typescript.yml` - TypeScript/JavaScript Qualitätsprüfung
 - **Tests**: `test-frontend.yml` - Frontend-Test-Suite
 
+### Android App
+- **Tests**: `test-app-android.yml` - Android-Unit- und Integrationstests via Gradle
+
 ### Deployment
 - **Deployment**: `deployment.yml` - Deployment-Prozess
 - **Deploy Slash-Commands**: `deploy-slash-commands.yml` - Deployment von Slash-Befehlen nach Discord
@@ -39,6 +43,7 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 │   └── workflows/              # GitHub Actions Workflows
 │       ├── lint-python.yml
 │       ├── lint-typescript.yml
+│       ├── test-app-android.yml
 │       ├── test-backend-python.yml
 │       ├── test-frontend.yml
 │       ├── deployment.yml

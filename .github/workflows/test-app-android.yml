@@ -1,0 +1,42 @@
+name: Test Android App
+
+on:
+  workflow_call:
+    inputs:
+      java_version:
+        required: false
+        type: string
+        default: '17'
+      java_distribution:
+        required: false
+        type: string
+        default: 'temurin'
+      gradle_task:
+        required: false
+        type: string
+        default: 'test'
+      max_heap_size:
+        required: false
+        type: string
+        default: '4g'
+
+jobs:
+  test-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java_version }}
+          distribution: ${{ inputs.java_distribution }}
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run tests
+        run: ./gradlew ${{ inputs.gradle_task }} --no-daemon -Dorg.gradle.jvmargs="-Xmx${{ inputs.max_heap_size }}"
