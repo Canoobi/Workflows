@@ -47,6 +47,22 @@ Die Browser-Binaries werden unter `~/.cache/ms-playwright` gecacht; der Cache-Ke
 
 Voraussetzung im aufrufenden Repository: `@playwright/test` als Dependency, eine Playwright-Konfiguration und ein Build-Script, das der `build_command` entspricht.
 
+### Infrastruktur
+- **nginx-Konfiguration**: `validate-nginx-config.yml` - Prüft eine `nginx.conf` mit `nginx -t`
+
+#### validate-nginx-config.yml
+
+Der Workflow checkt das aufrufende Repository aus und lässt `nginx -t` in einem Wegwerf-Container gegen die angegebene Konfiguration laufen.
+
+| Input | Pflicht | Standard | Zweck |
+|-------|---------|----------|-------|
+| `config_path` | nein | `config/nginx.conf` | Pfad der zu prüfenden Datei, relativ zur Repository-Wurzel |
+| `nginx_image` | nein | `'nginx:latest'` | Image, gegen das geprüft wird |
+
+Geprüft wird bewusst gegen **dasselbe Image**, das der Container später verwendet. Eine Prüfung gegen ein auf dem Runner installiertes nginx sagte über die dort geltenden Direktiven und die mitgelieferte `mime.types` nichts aus.
+
+Sinnvoll ist der Workflow überall dort, wo ein Deployment `docker-compose down` ausführt, bevor es neu startet: Eine fehlerhafte `nginx.conf` lässt den Container nicht hochkommen, und der Dienst bliebe nach dem `down` unten. Der aufrufende Workflow sollte den Deploy-Job daher über `needs` an diesen Job hängen.
+
 ### Android App
 - **Tests**: `test-app-android.yml` - Android-Unit- und Integrationstests via Gradle
 
@@ -67,6 +83,7 @@ Voraussetzung im aufrufenden Repository: `@playwright/test` als Dependency, eine
 │       ├── test-backend-python.yml
 │       ├── test-frontend.yml
 │       ├── test-e2e-playwright.yml
+│       ├── validate-nginx-config.yml
 │       ├── deployment.yml
 │       ├── deploy-slash-commands.yml
 │       └── trigger-deploy.yml

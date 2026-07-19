@@ -1,0 +1,34 @@
+name: Validate nginx Config
+
+on:
+  workflow_call:
+    inputs:
+      config_path:
+        required: false
+        type: string
+        default: config/nginx.conf
+      nginx_image:
+        required: false
+        type: string
+        default: 'nginx:latest'
+
+jobs:
+  validate-nginx-config:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      # Faengt die Fehlerklasse ab, die im Betrieb am teuersten ist: Eine fehlerhafte
+      # nginx.conf laesst den Container nicht starten. Da das Deployment vorher
+      # `docker-compose down` ausfuehrt, bliebe der Dienst danach unten.
+      #
+      # Geprueft wird gegen dasselbe Image, das der Container spaeter verwendet — eine
+      # Pruefung gegen das auf dem Runner installierte nginx sagte ueber die dort geltenden
+      # Direktiven und mime.types nichts aus.
+      - name: Check config
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/${{ inputs.config_path }}:/etc/nginx/nginx.conf:ro" \
+            ${{ inputs.nginx_image }} nginx -t
