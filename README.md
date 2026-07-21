@@ -12,6 +12,7 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 | **lint-typescript.yml** | Prüft TypeScript/JavaScript Code auf Stilkonventionen |
 | **test-app-android.yml** | Führt Android-App-Tests (Gradle) aus                  |
 | **test-backend-python.yml** | Führt Backend-Tests (Python) aus                      |
+| **test-backend-node.yml** | Führt Backend-Tests (Node) aus, optional mit Prisma   |
 | **test-frontend.yml** | Führt Frontend-Tests aus                              |
 | **test-e2e-playwright.yml** | Führt End-to-End-Tests mit Playwright aus             |
 | **deployment.yml** | Führt Deployment aus                                  |
@@ -23,6 +24,22 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 ### Backend (Python)
 - **Linting**: `lint-python.yml` - Automatische Codequalitätsprüfung
 - **Tests**: `test-backend-python.yml` - Unit- und Integrationstests
+
+### Backend (Node)
+- **Tests**: `test-backend-node.yml` - Unit- und Integrationstests für Node-Backends
+
+#### test-backend-node.yml
+
+Der Workflow checkt das aufrufende Repository aus, installiert die Dependencies über `npm ci`, generiert bei Bedarf den Prisma-Client und führt anschließend die Test-Suite aus. Der npm-Cache leitet sich aus der `package-lock.json` des Backend-Verzeichnisses ab.
+
+| Input | Pflicht | Standard | Zweck |
+|-------|---------|----------|-------|
+| `node_version` | nein | `'22'` | Node-Version für die Testausführung |
+| `backend_directory` | nein | `.` | Arbeitsverzeichnis des Backends |
+| `run_prisma_generate` | nein | `false` | Führt vor den Tests `npx prisma generate` aus |
+| `test_command` | nein | `npm test` | Befehl für die Testausführung |
+
+Voraussetzung im aufrufenden Repository: eine `package-lock.json` im `backend_directory` und ein Test-Script, das dem `test_command` entspricht. Wird `run_prisma_generate` aktiviert, muss Prisma als Dependency vorhanden sein.
 
 ### Frontend
 - **Linting**: `lint-typescript.yml` - TypeScript/JavaScript Qualitätsprüfung
@@ -81,6 +98,7 @@ Sinnvoll ist der Workflow überall dort, wo ein Deployment `docker-compose down`
 │       ├── lint-typescript.yml
 │       ├── test-app-android.yml
 │       ├── test-backend-python.yml
+│       ├── test-backend-node.yml
 │       ├── test-frontend.yml
 │       ├── test-e2e-playwright.yml
 │       ├── validate-nginx-config.yml
