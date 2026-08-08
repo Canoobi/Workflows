@@ -88,6 +88,66 @@ Sinnvoll ist der Workflow überall dort, wo ein Deployment `docker-compose down`
 - **Deploy Slash-Commands**: `deploy-slash-commands.yml` - Deployment von Slash-Befehlen nach Discord
 - **Trigger Deploy**: `trigger-deploy.yml` - Startet den Deploy-Prozess
 
+#### trigger-deploy.yml
+
+Der Workflow ist der Einstiegspunkt für aufrufende Repositories. Er stößt `deployment.yml` über die GitHub-API an und wartet auf dessen Ergebnis.
+
+| Input | Pflicht | Standard | Zweck |
+|-------|---------|----------|-------|
+| `container_names` | nein | `""` | Container, die ohne Compose neu gestartet werden |
+| `run_pull_changes` | nein | `true` | Führt `git pull` im Repository-Verzeichnis aus |
+| `run_stop_compose_containers` | nein | `false` | Führt `docker-compose down` aus |
+| `run_build_docker_compose_file` | nein | `false` | Führt `docker-compose build` aus |
+| `run_start_compose_containers` | nein | `false` | Führt `docker-compose up -d` aus |
+| `run_restart_non_compose_containers` | nein | `false` | Startet die Container aus `container_names` neu |
+| `health_url` | nein | `""` | URL, die nach dem Deploy gesund antworten muss. Leer bedeutet: keine Prüfung |
+| `health_timeout_seconds` | nein | `180` | Wie lange auf eine gesunde Antwort gewartet wird |
+| `health_expected_status` | nein | `200` | Erwarteter HTTP-Statuscode |
+
+##### Deploy-Verifikation
+
+Ist `health_url` gesetzt, pollt der Workflow nach dem Start der Container den angegebenen Endpunkt und schlägt fehl, wenn innerhalb von `health_timeout_seconds` kein `health_expected_status` zurückkommt.
+
+Der Schritt ist vollständig optional. Ohne `health_url` wird der zugehörige Job übersprungen, und alle bestehenden aufrufenden Workflows laufen unverändert weiter. Repositories ohne HTTP-Schnittstelle, etwa reine Discord-Bots, bleiben deshalb ohne Angabe.
+
+Beispiel für einen aufrufenden Workflow:
+
+```yaml
+    uses: Canoobi/Workflows/.github/workflows/trigger-deploy.yml@main
+    with:
+      run_stop_compose_containers: true
+      run_build_docker_compose_file: true
+      run_start_compose_containers: true
+      health_url: https://YOUR_SERVER_URL_HERE/health
+      health_timeout_seconds: 180
+      health_expected_status: 200
+    secrets:
+      WORKFLOWS_REPO_TOKEN: ${{ secrets.WORKFLOWS_REPO_TOKEN }}
+      REPO_PATH: ${{ secrets.REPO_PATH }}
+```
+
+Eigenschaften der Prüfung:
+
+- Sie läuft per SSH **auf dem Zielserver**, nicht auf dem GitHub-Runner. Interne Adressen sind vom Runner aus nicht erreichbar.
+- Der Aufruf erfolgt mit `curl -k`, da die internen Dienste selbstsignierte Zertifikate verwenden.
+- Zwischen zwei Versuchen liegen 5 Sekunden. Es wird mindestens einmal geprüft, auch bei einem Timeout von 0.
+- Antwortet der Endpunkt nicht, meldet die Ausgabe `last status 000`; bei falschem Statuscode den tatsächlich empfangenen Code.
+- Der Job hängt über `needs` an allen vorherigen Deploy-Jobs und wird nur ausgeführt, wenn diese erfolgreich waren oder abgeschaltet sind.
+
+##### Warum die drei Eingaben in `deployment.yml` als ein Wert ankommen
+
+`deployment.yml` wird über `workflow_dispatch` angestoßen. GitHub erlaubt dort **höchstens 10 Top-Level-Inputs**; neun waren bereits belegt. Die drei Eingaben oben werden deshalb von `trigger-deploy.yml` zu einem einzigen Input `health_check` im Format
+
+```text
+URL|timeout_seconds|expected_status
+```
+
+zusammengesetzt und im Zielworkflow wieder zerlegt. Ist `health_url` leer, wird ein leerer Wert übergeben und der Job übersprungen.
+
+Damit ist das Input-Kontingent von `deployment.yml` ausgeschöpft. Weitere Eingaben müssen in einen bestehenden Wert eingebettet werden, sonst wird die Workflow-Datei ungültig und **alle** Deployments schlagen fehl.
+
+Der Wert wird als Umgebungsvariable (`env` zusammen mit `envs:`) an das SSH-Skript übergeben und nicht per `${{ }}` in den Skripttext eingesetzt. Ein direkt eingesetzter Ausdruck würde von der Shell des Zielservers ausgeführt; ein Wert mit `$(…)` oder Backticks liefe dort als Deploy-Benutzer.
+
 ## 📁 Projektstruktur
 
 ```

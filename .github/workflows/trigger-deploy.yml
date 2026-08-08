@@ -33,6 +33,24 @@ on:
         type: boolean
         default: false
 
+      # Leaving health_url empty skips the verification, which is what every
+      # caller that does not set it gets. The two settings below then have no
+      # effect. Repositories without an HTTP interface stay as they are.
+      health_url:
+        required: false
+        type: string
+        default: ""
+
+      health_timeout_seconds:
+        required: false
+        type: number
+        default: 180
+
+      health_expected_status:
+        required: false
+        type: number
+        default: 200
+
     secrets:
       WORKFLOWS_REPO_TOKEN:
         required: true
@@ -64,7 +82,8 @@ jobs:
                 "run_stop_compose_containers": "${{ inputs.run_stop_compose_containers }}",
                 "run_build_docker_compose_file": "${{ inputs.run_build_docker_compose_file }}",
                 "run_start_compose_containers": "${{ inputs.run_start_compose_containers }}",
-                "run_restart_non_compose_containers": "${{ inputs.run_restart_non_compose_containers }}"
+                "run_restart_non_compose_containers": "${{ inputs.run_restart_non_compose_containers }}",
+                "health_check": "${{ inputs.health_url != '' && format('{0}|{1}|{2}', inputs.health_url, inputs.health_timeout_seconds, inputs.health_expected_status) || '' }}"
               }
             }')
 

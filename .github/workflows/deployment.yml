@@ -55,6 +55,16 @@ on:
         default: false
         description: ""
 
+      # Three settings in one input on purpose: workflow_dispatch allows at
+      # most 10 top-level inputs and the nine above already use nine of them.
+      # trigger-deploy.yml assembles this value from its own three typed
+      # inputs; an empty value skips the verification entirely.
+      health_check:
+        required: false
+        type: string
+        default: ""
+        description: "URL|timeout_seconds|expected_status, e.g. https://host:443/health|180|200. Empty means no check."
+
 jobs:
   check-authorization:
     runs-on: ubuntu-latest
@@ -223,3 +233,128 @@ jobs:
           script: |
             cd "${{ inputs.repo_path }}"
             echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker restart ${{ inputs.container_names }}
+
+  verify-deployment-health:
+    if: >-
+      ${{
+        inputs.health_check != '' &&
+        always() &&
+        needs.check-authorization.result == 'success' &&
+        (
+          !inputs.run_pull_changes ||
+          needs.deploy-changes.result == 'success'
+        ) &&
+        (
+          !inputs.run_stop_compose_containers ||
+          needs.stop-compose-containers.result == 'success'
+        ) &&
+        (
+          !inputs.run_build_docker_compose_file ||
+          needs.build-docker-compose-file.result == 'success'
+        ) &&
+        (
+          !inputs.run_start_compose_containers ||
+          needs.start-compose-containers.result == 'success'
+        ) &&
+        (
+          !inputs.run_restart_non_compose_containers ||
+          inputs.container_names == '' ||
+          needs.restart-non-compose-containers.result == 'success'
+        )
+      }}
+    needs:
+      - check-authorization
+      - deploy-changes
+      - stop-compose-containers
+      - build-docker-compose-file
+      - start-compose-containers
+      - restart-non-compose-containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deployment is healthy
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          HEALTH_CHECK: ${{ inputs.health_check }}
+        with:
+          host: ${{ secrets.NAS_HOST }}
+          username: ${{ secrets.NAS_USER }}
+          password: ${{ secrets.NAS_SSH_KEY }}
+          # Forwarded as an environment variable rather than interpolated into
+          # the script: an expression pasted into a shell command is executed
+          # by that shell, so a value containing $(...) or a backtick would run
+          # on the NAS as the deploy user.
+          envs: HEALTH_CHECK
+          # The health endpoint lives on the NAS LAN, which a GitHub-hosted
+          # runner cannot reach -- the poll has to happen on the NAS itself.
+          # POSIX sh only: this runs in the NAS login shell, not in bash.
+          script: |
+            set -u
+
+            if [ -z "${HEALTH_CHECK:-}" ]; then
+              echo "HEALTH_CHECK did not reach the remote shell -- check the envs: entry."
+              exit 1
+            fi
+
+            url="${HEALTH_CHECK%%|*}"
+            rest="${HEALTH_CHECK#*|}"
+            timeout_seconds="${rest%%|*}"
+            expected_status="${rest##*|}"
+
+            # A workflow_call input typed as number can reach the dispatch API
+            # rendered as "180.0". Dropping the fraction keeps the configured
+            # value instead of silently falling back to the default below.
+            timeout_seconds="${timeout_seconds%%.*}"
+            expected_status="${expected_status%%.*}"
+
+            # Also covers a value typed by hand with no separators at all, in
+            # which case both fields still hold the URL and are not numeric.
+            case "$timeout_seconds" in
+              ''|*[!0-9]*) timeout_seconds=180 ;;
+            esac
+            case "$expected_status" in
+              ''|*[!0-9]*) expected_status=200 ;;
+            esac
+
+            if [ -z "$url" ]; then
+              echo "No health URL in HEALTH_CHECK."
+              exit 1
+            fi
+
+            # DSM gives a non-interactive SSH session a minimal PATH, which is
+            # why the deploy steps above call git and docker by absolute path.
+            curl_bin=$(command -v curl 2>/dev/null || true)
+            if [ -z "$curl_bin" ]; then
+              for candidate in /usr/bin/curl /opt/bin/curl /usr/local/bin/curl; do
+                if [ -x "$candidate" ]; then
+                  curl_bin="$candidate"
+                  break
+                fi
+              done
+            fi
+            if [ -z "$curl_bin" ]; then
+              echo "No curl on the NAS, cannot verify the deployment."
+              exit 1
+            fi
+
+            start=$(date +%s)
+            deadline=$(( start + timeout_seconds ))
+            echo "Waiting up to ${timeout_seconds}s for $url to answer with $expected_status"
+
+            while :; do
+              # -k because the internal services use self-signed certificates.
+              code=$("$curl_bin" -sk -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)
+
+              if [ "$code" = "$expected_status" ]; then
+                echo "Healthy after $(( $(date +%s) - start ))s"
+                exit 0
+              fi
+
+              # Checked after the attempt so a timeout of 0 still probes once.
+              if [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "Deployment did not become healthy within ${timeout_seconds}s, last status $code"
+                exit 1
+              fi
+
+              echo "  still $code"
+              sleep 5
+            done
