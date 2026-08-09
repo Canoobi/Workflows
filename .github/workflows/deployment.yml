@@ -271,6 +271,31 @@ jobs:
       - restart-non-compose-containers
     runs-on: ubuntu-latest
     steps:
+      - name: Determine SSH command timeout for the health check
+        id: health-check-timeout
+        run: |
+          HEALTH_CHECK="${{ inputs.health_check }}"
+
+          # health_check is "url|timeout_seconds|expected_status" (see the
+          # note above on why this is one input). Extracting timeout_seconds
+          # here mirrors the parsing/normalisation the remote script below
+          # performs on the same value, so this step and the actual polling
+          # loop always agree on the effective timeout.
+          rest="${HEALTH_CHECK#*|}"
+          timeout_seconds="${rest%%|*}"
+          timeout_seconds="${timeout_seconds%%.*}"
+          case "$timeout_seconds" in
+            ''|*[!0-9]*) timeout_seconds=180 ;;
+          esac
+
+          # appleboy/ssh-action defaults command_timeout to 10 minutes. A
+          # health_timeout_seconds above roughly 9 minutes would let the SSH
+          # session get killed mid-poll, dropping a deployment that was about
+          # to be reported healthy. 60s margin covers SSH connection setup,
+          # the final curl attempt (-m 5 in the script below) and one or two
+          # extra loop/sleep iterations.
+          echo "command_timeout=$((timeout_seconds + 60))s" >> "$GITHUB_OUTPUT"
+
       - name: Verify deployment is healthy
         uses: appleboy/ssh-action@v1.2.5
         env:
@@ -279,6 +304,11 @@ jobs:
           host: ${{ secrets.NAS_HOST }}
           username: ${{ secrets.NAS_USER }}
           password: ${{ secrets.NAS_SSH_KEY }}
+          # Derived from health_timeout_seconds (see the step above) instead
+          # of the action's 10-minute default, which would otherwise cut off
+          # a longer, explicitly configured health_timeout_seconds before the
+          # polling loop below is done.
+          command_timeout: ${{ steps.health-check-timeout.outputs.command_timeout }}
           # Forwarded as an environment variable rather than interpolated into
           # the script: an expression pasted into a shell command is executed
           # by that shell, so a value containing $(...) or a backtick would run
@@ -336,17 +366,47 @@ jobs:
               exit 1
             fi
 
+            # `docker-compose up -d` returns as soon as the containers are
+            # created, not once they are actually accepting connections, and
+            # `run_pull_changes` alone (the default for every caller that only
+            # sets health_url) does not touch the running deployment at all --
+            # this check can then end up probing an instance the deploy never
+            # changed. A short settle pause before the first attempt keeps a
+            # still-answering old container or a reverse proxy in front of it
+            # from passing as "healthy" before the new one has bound its port.
+            sleep 5
+
             start=$(date +%s)
             deadline=$(( start + timeout_seconds ))
             echo "Waiting up to ${timeout_seconds}s for $url to answer with $expected_status"
 
+            # Two consecutive successful responses, not one: a single 200 can
+            # still be the old container or a caching proxy in front of it.
+            # Requiring the same result twice, 5s apart, is a cheap way to
+            # tell "still answering from before" apart from "the new
+            # container is actually up". A timeout_seconds of 0 can no longer
+            # succeed as a result -- it cannot fit two probes -- see the
+            # README for that tradeoff.
+            required_successes=2
+            consecutive_successes=0
+
             while :; do
               # -k because the internal services use self-signed certificates.
-              code=$("$curl_bin" -sk -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)
+              # -L because a health endpoint behind a reverse proxy may issue
+              # a redirect (e.g. http->https, or a trailing-slash redirect)
+              # that is not itself a sign of trouble.
+              code=$("$curl_bin" -sk -L -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)
 
               if [ "$code" = "$expected_status" ]; then
-                echo "Healthy after $(( $(date +%s) - start ))s"
-                exit 0
+                consecutive_successes=$((consecutive_successes + 1))
+                echo "  $code ($consecutive_successes/$required_successes consecutive)"
+                if [ "$consecutive_successes" -ge "$required_successes" ]; then
+                  echo "Healthy after $(( $(date +%s) - start ))s"
+                  exit 0
+                fi
+              else
+                consecutive_successes=0
+                echo "  still $code"
               fi
 
               # Checked after the attempt so a timeout of 0 still probes once.
@@ -355,6 +415,5 @@ jobs:
                 exit 1
               fi
 
-              echo "  still $code"
               sleep 5
             done

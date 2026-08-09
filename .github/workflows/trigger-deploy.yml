@@ -107,7 +107,32 @@ jobs:
         run: |
           RUN_URL="${{ steps.trigger.outputs.run_url }}"
           HTML_URL="${{ steps.trigger.outputs.html_url }}"
-          TIMEOUT_SECONDS=600
+
+          # 600s was calibrated for the five original deploy-changes /
+          # stop-compose-containers / build-docker-compose-file /
+          # start-compose-containers / restart-non-compose-containers jobs,
+          # before verify-deployment-health existed as a sixth job. That job
+          # adds its own runner queue/start-up time plus up to
+          # health_timeout_seconds of polling on top of the original budget.
+          # 30s covers runner start-up with margin -- together with the
+          # default 180s health_timeout_seconds that matches the ~210s worst
+          # case this was originally reviewed against. Added only when
+          # health_url is set: an empty health_url skips the health job
+          # entirely, so the original five-job budget is left unchanged.
+          BASE_TIMEOUT_SECONDS=600
+          RUNNER_STARTUP_OVERHEAD_SECONDS=30
+          HEALTH_URL="${{ inputs.health_url }}"
+          HEALTH_TIMEOUT_SECONDS="${{ inputs.health_timeout_seconds }}"
+          # A workflow_call number input can render with a trailing ".0"
+          # (see the same caveat in deployment.yml); bash arithmetic below
+          # cannot parse that, so it is stripped defensively.
+          HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS%%.*}"
+          if [[ -n "$HEALTH_URL" ]]; then
+            TIMEOUT_SECONDS=$((BASE_TIMEOUT_SECONDS + RUNNER_STARTUP_OVERHEAD_SECONDS + HEALTH_TIMEOUT_SECONDS))
+          else
+            TIMEOUT_SECONDS=$BASE_TIMEOUT_SECONDS
+          fi
+
           SLEEP_SECONDS=5
           START_TIME=$(date +%s)
           
