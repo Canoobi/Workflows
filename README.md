@@ -96,13 +96,21 @@ Der Workflow ist der Einstiegspunkt für aufrufende Repositories. Er stößt `de
 |-------|---------|----------|-------|
 | `container_names` | nein | `""` | Container, die ohne Compose neu gestartet werden |
 | `run_pull_changes` | nein | `true` | Führt `git pull` im Repository-Verzeichnis aus |
-| `run_stop_compose_containers` | nein | `false` | Führt `docker-compose down` aus |
+| `run_stop_compose_containers` | nein | `false` | Führt `docker-compose down --remove-orphans` aus |
 | `run_build_docker_compose_file` | nein | `false` | Führt `docker-compose build` aus |
 | `run_start_compose_containers` | nein | `false` | Führt `docker-compose up -d` aus |
 | `run_restart_non_compose_containers` | nein | `false` | Startet die Container aus `container_names` neu |
 | `health_url` | nein | `""` | URL, die nach dem Deploy gesund antworten muss. Leer bedeutet: keine Prüfung |
 | `health_timeout_seconds` | nein | `180` | Wie lange auf eine gesunde Antwort gewartet wird |
 | `health_expected_status` | nein | `200` | Erwarteter HTTP-Statuscode |
+
+##### Verwaiste Container
+
+`docker-compose down` läuft seit dem 09.08.2026 mit `--remove-orphans`. Ohne das Flag überlebt ein Container, dessen Dienst aus der `docker-compose.yml` entfernt wurde, jedes `down` und `up -d`: Compose kennt ihn nicht mehr und fasst ihn deshalb nicht an. Er läuft mit dem alten Image weiter, belegt seinen Port und sieht für jede Überwachung wie ein gesunder Dienst aus. Genau so überlebte `InfraMonitor-SnmpExporter` am 09.08.2026 seinen eigenen Ausbau und musste von Hand entfernt werden.
+
+Der Wirkungsbereich ist eng: Betroffen sind ausschließlich Container desselben Compose-Projekts, also solche, die früher einmal in derselben `docker-compose.yml` standen. Container aus anderen Projekten und von Hand gestartete fasst Compose nicht an.
+
+Ein eigener Schalter dafür ist nicht möglich: `workflow_dispatch` erlaubt höchstens zehn Eingaben, und `deployment.yml` hat sie bereits vergeben — deshalb steckt auch die Deploy-Verifikation als drei Werte in einer einzelnen `health_check`-Eingabe.
 
 ##### Deploy-Verifikation
 
