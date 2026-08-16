@@ -121,23 +121,6 @@ jobs:
           password: ${{ secrets.NAS_SSH_KEY }}
           script: |
             cd "${{ inputs.repo_path }}"
-            # --remove-orphans: Ohne das Flag ueberlebt ein Container, dessen
-            # Dienst aus der compose-Datei entfernt wurde, jedes `down` und
-            # `up -d` -- Compose kennt ihn nicht mehr und fasst ihn deshalb
-            # nicht an. Er laeuft dann mit dem alten Image weiter, belegt
-            # seinen Port und sieht fuer jede Ueberwachung wie ein gesunder
-            # Dienst aus. Genau so ueberlebte InfraMonitor-SnmpExporter am
-            # 09.08.2026 seinen eigenen Ausbau und musste von Hand entfernt
-            # werden.
-            #
-            # Der Wirkungsbereich ist eng: Betroffen sind ausschliesslich
-            # Container desselben Compose-Projekts, also solche, die frueher
-            # einmal in dieser compose-Datei standen. Container aus anderen
-            # Projekten oder von Hand gestartete fasst Compose nicht an.
-            #
-            # Kein eigener Schalter dafuer: workflow_dispatch erlaubt hoechstens
-            # zehn Eingaben, und die sind bereits vergeben (siehe den Hinweis
-            # am health_check-Eingang).
             echo "${{ secrets.NAS_SSH_KEY }}" | sudo -S /usr/local/bin/docker-compose down --remove-orphans
 
   build-docker-compose-file:
