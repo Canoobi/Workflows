@@ -1,0 +1,77 @@
+name: Build Backend Node
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        required: false
+        type: string
+        default: '22'
+      backend_directory:
+        required: false
+        type: string
+        default: '.'
+      run_prisma_generate:
+        required: false
+        type: boolean
+        default: false
+      # Runs between `npm ci` and the build, so a vulnerable dependency stops the
+      # pipeline before anything is compiled. Empty means no audit. The filters
+      # belong to the calling repository: which severities block a release and
+      # whether dev dependencies count is a policy decision per project, not a
+      # property of this workflow.
+      audit_command:
+        required: false
+        type: string
+        default: ''
+      build_command:
+        required: false
+        type: string
+        default: 'npm run build'
+      # Runs after the build. Empty means no verification step. Intended for
+      # repository-specific consistency checks that need the compiled output or
+      # simply belong at the end of the build.
+      verify_command:
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build-backend-node:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.backend_directory }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ inputs.backend_directory }}
+
+      - name: Audit dependencies
+        if: ${{ inputs.audit_command != '' }}
+        run: ${{ inputs.audit_command }}
+        working-directory: ${{ inputs.backend_directory }}
+
+      # The generated client lives in node_modules and is not versioned, so a
+      # build that imports it fails without this step.
+      - name: Generate Prisma client
+        if: ${{ inputs.run_prisma_generate }}
+        run: npx prisma generate
+        working-directory: ${{ inputs.backend_directory }}
+
+      - name: Build
+        run: ${{ inputs.build_command }}
+        working-directory: ${{ inputs.backend_directory }}
+
+      - name: Verify
+        if: ${{ inputs.verify_command != '' }}
+        run: ${{ inputs.verify_command }}
+        working-directory: ${{ inputs.backend_directory }}

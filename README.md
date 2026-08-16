@@ -27,6 +27,7 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 
 ### Backend (Node)
 - **Tests**: `test-backend-node.yml` - Unit- und Integrationstests für Node-Backends
+- **Build**: `build-backend-node.yml` - Übersetzungslauf für Node-Backends
 
 #### test-backend-node.yml
 
@@ -40,6 +41,27 @@ Der Workflow checkt das aufrufende Repository aus, installiert die Dependencies 
 | `test_command` | nein | `npm test` | Befehl für die Testausführung |
 
 Voraussetzung im aufrufenden Repository: eine `package-lock.json` im `backend_directory` und ein Test-Script, das dem `test_command` entspricht. Wird `run_prisma_generate` aktiviert, muss Prisma als Dependency vorhanden sein.
+
+#### build-backend-node.yml
+
+Gegenstück zu `test-backend-node.yml` mit demselben Aufbau und derselben Eingabeform: Der Workflow checkt das aufrufende Repository aus, installiert die Dependencies über `npm ci`, generiert bei Bedarf den Prisma-Client und führt anschließend den Übersetzungslauf aus. Er prüft damit, dass der Stand baubar ist; ein Artefakt wird nicht hochgeladen, weil die Images der aufrufenden Repositories auf dem Zielserver aus den Quellen gebaut werden.
+
+| Input | Pflicht | Standard | Zweck |
+|-------|---------|----------|-------|
+| `node_version` | nein | `'22'` | Node-Version für den Build |
+| `backend_directory` | nein | `.` | Arbeitsverzeichnis des Backends |
+| `run_prisma_generate` | nein | `false` | Führt vor dem Build `npx prisma generate` aus |
+| `audit_command` | nein | `''` | Prüfbefehl zwischen Installation und Build; leer überspringt den Schritt |
+| `build_command` | nein | `npm run build` | Befehl für den Übersetzungslauf |
+| `verify_command` | nein | `''` | Prüfbefehl nach dem Build; leer überspringt den Schritt |
+
+Schrittfolge: Checkout, Setup Node, `npm ci`, optional `audit_command`, optional `npx prisma generate`, `build_command`, optional `verify_command`.
+
+`audit_command` liegt bewusst **vor** dem Build, damit eine verwundbare Abhängigkeit die Pipeline stoppt, bevor überhaupt übersetzt wird. Der Befehl wird vollständig vom aufrufenden Repository vorgegeben und nicht hier zusammengesetzt: Welche Schweregrade ein Release blockieren und ob Dev-Dependencies mitzählen, ist eine Festlegung des jeweiligen Projekts und keine Eigenschaft dieses Workflows.
+
+`verify_command` läuft nach dem Build und ist für repositoryeigene Konsistenzprüfungen gedacht, die das Kompilat voraussetzen oder schlicht ans Ende des Builds gehören.
+
+Voraussetzung im aufrufenden Repository: eine `package-lock.json` im `backend_directory` und ein Build-Script, das dem `build_command` entspricht. Wird `run_prisma_generate` aktiviert, muss Prisma als Dependency vorhanden sein — der erzeugte Client liegt in `node_modules` und ist nicht versioniert, ein Build ohne diesen Schritt scheitert also an fehlenden Typen.
 
 ### Frontend
 - **Linting**: `lint-typescript.yml` - TypeScript/JavaScript Qualitätsprüfung
@@ -172,6 +194,7 @@ Der Wert wird als Umgebungsvariable (`env` zusammen mit `envs:`) an das SSH-Skri
 │       ├── test-app-android.yml
 │       ├── test-backend-python.yml
 │       ├── test-backend-node.yml
+│       ├── build-backend-node.yml
 │       ├── test-frontend.yml
 │       ├── test-e2e-playwright.yml
 │       ├── validate-nginx-config.yml
