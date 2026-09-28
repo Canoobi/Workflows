@@ -18,6 +18,7 @@ Dieses Projekt automatisiert wichtige Entwicklungs- und Deployment-Prozesse mit 
 | **deployment.yml** | Führt Deployment aus                                  |
 | **deploy-slash-commands.yml** | Führt Deployment von Slash-Befehlen aus               |
 | **trigger-deploy.yml** | Startet den Deployment-Prozess                        |
+| **create-release.yml** | Erstellt ein GitHub-Release mit generierten Release-Notes |
 
 ## 🚀 Workflows
 
@@ -109,6 +110,7 @@ Sinnvoll ist der Workflow überall dort, wo ein Deployment `docker-compose down`
 - **Deployment**: `deployment.yml` - Deployment-Prozess
 - **Deploy Slash-Commands**: `deploy-slash-commands.yml` - Deployment von Slash-Befehlen nach Discord
 - **Trigger Deploy**: `trigger-deploy.yml` - Startet den Deploy-Prozess
+- **Release**: `create-release.yml` - Erstellt nach dem Deploy ein GitHub-Release zum Tag
 
 #### trigger-deploy.yml
 
@@ -183,6 +185,39 @@ Damit ist das Input-Kontingent von `deployment.yml` ausgeschöpft. Weitere Einga
 
 Der Wert wird als Umgebungsvariable (`env` zusammen mit `envs:`) an das SSH-Skript übergeben und nicht per `${{ }}` in den Skripttext eingesetzt. Ein direkt eingesetzter Ausdruck würde von der Shell des Zielservers ausgeführt; ein Wert mit `$(…)` oder Backticks liefe dort als Deploy-Benutzer.
 
+#### create-release.yml
+
+Erstellt im aufrufenden Repository ein GitHub-Release. Der Workflow läuft im aufrufenden Repository selbst, aus diesem Repository wird nur die Workflow-Definition bezogen. Name und Titel sind der Tag, die Release-Notes erzeugt GitHub selbst (`gh release create --generate-notes`): gemergte Pull Requests, neue Mitwirkende und ein Vergleichslink seit dem vorherigen Release.
+
+| Input | Pflicht | Standard | Zweck |
+|-------|---------|----------|-------|
+| `tag` | nein | `""` | Tag, aus dem das Release entsteht. Leer bedeutet: der Tag, auf dem der aufrufende Workflow läuft (`github.ref_name`) |
+
+| Secret | Pflicht | Zweck |
+|--------|---------|-------|
+| `WORKFLOWS_REPO_TOKEN` | ja | Token, mit dem das Release erstellt wird. Dasselbe Secret wie bei `trigger-deploy.yml` |
+
+Beispiel für einen aufrufenden Workflow, der nur nach erfolgreichem Deploy ein Release erstellt:
+
+```yaml
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - deploy
+    name: GitHub Release
+    uses: Canoobi/Workflows/.github/workflows/create-release.yml@main
+    secrets:
+      WORKFLOWS_REPO_TOKEN: ${{ secrets.WORKFLOWS_REPO_TOKEN }}
+```
+
+Eigenschaften:
+
+- **Token:** Der Workflow verwendet `WORKFLOWS_REPO_TOKEN` und nicht das `GITHUB_TOKEN` des Aufrufers. Ob das `GITHUB_TOKEN` schreiben darf, entscheidet die Richtlinie des Kontos oder der Organisation, zu der das aufrufende Repository gehört; das Secret liegt dagegen in jedem deployenden Repository ohnehin vor. Voraussetzung ist, dass das Token Releases im aufrufenden Repository anlegen darf, bei einem Classic Personal Access Token also der Scope `repo` eines Kontos mit Schreibrecht auf dieses Repository.
+- **Keine Autorisierungsprüfung:** Anders als `deployment.yml` prüft der Workflow nicht gegen `ADMIN_USERS`. Wer einen Tag pushen kann, hat im Repository ohnehin Schreibrecht; hängt der Job wie im Beispiel über `needs` am Deploy, entsteht ein Release außerdem nur nach einem Deploy, der diese Prüfung bestanden hat.
+- **Wiederholbar:** Existiert das Release bereits, endet der Schritt erfolgreich ohne Änderung. Ein erneuter Lauf der aufrufenden Pipeline scheitert dadurch nicht am Release des ersten Laufs.
+- **Kein neuer Tag:** `--verify-tag` bricht ab, wenn der Tag im Repository nicht existiert, statt ihn anzulegen.
+- **Keine Ausdrücke im Skripttext:** Tag, Repository und Token erreichen das Skript als Umgebungsvariablen, aus demselben Grund wie bei `deployment.yml` (siehe oben).
+
 ## 📁 Projektstruktur
 
 ```
@@ -200,7 +235,8 @@ Der Wert wird als Umgebungsvariable (`env` zusammen mit `envs:`) an das SSH-Skri
 │       ├── validate-nginx-config.yml
 │       ├── deployment.yml
 │       ├── deploy-slash-commands.yml
-│       └── trigger-deploy.yml
+│       ├── trigger-deploy.yml
+│       └── create-release.yml
 ├── .gitignore
 └── README.md
 ```
