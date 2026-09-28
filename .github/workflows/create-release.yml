@@ -9,7 +9,7 @@ on:
         default: ""
 
     secrets:
-      WORKFLOWS_REPO_TOKEN:
+      RELEASE_TOKEN:
         required: true
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Create GitHub release
         env:
-          GH_TOKEN: ${{ secrets.WORKFLOWS_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
         run: |

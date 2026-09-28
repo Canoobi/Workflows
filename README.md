@@ -195,7 +195,7 @@ Erstellt im aufrufenden Repository ein GitHub-Release. Der Workflow läuft im au
 
 | Secret | Pflicht | Zweck |
 |--------|---------|-------|
-| `WORKFLOWS_REPO_TOKEN` | ja | Token, mit dem das Release erstellt wird. Dasselbe Secret wie bei `trigger-deploy.yml` |
+| `RELEASE_TOKEN` | ja | Token, mit dem das Release im aufrufenden Repository erstellt wird |
 
 Beispiel für einen aufrufenden Workflow, der nur nach erfolgreichem Deploy ein Release erstellt:
 
@@ -207,12 +207,12 @@ Beispiel für einen aufrufenden Workflow, der nur nach erfolgreichem Deploy ein 
     name: GitHub Release
     uses: Canoobi/Workflows/.github/workflows/create-release.yml@main
     secrets:
-      WORKFLOWS_REPO_TOKEN: ${{ secrets.WORKFLOWS_REPO_TOKEN }}
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 ```
 
 Eigenschaften:
 
-- **Token:** Der Workflow verwendet `WORKFLOWS_REPO_TOKEN` und nicht das `GITHUB_TOKEN` des Aufrufers. Ob das `GITHUB_TOKEN` schreiben darf, entscheidet die Richtlinie des Kontos oder der Organisation, zu der das aufrufende Repository gehört; das Secret liegt dagegen in jedem deployenden Repository ohnehin vor. Voraussetzung ist, dass das Token Releases im aufrufenden Repository anlegen darf, bei einem Classic Personal Access Token also der Scope `repo` eines Kontos mit Schreibrecht auf dieses Repository.
+- **Token:** Der Workflow verwendet das Secret `RELEASE_TOKEN` des Aufrufers und nicht dessen `GITHUB_TOKEN`: Ob das `GITHUB_TOKEN` schreiben darf, entscheidet die Richtlinie des Kontos oder der Organisation, zu der das aufrufende Repository gehört. Benötigt wird ein Fine-grained Personal Access Token mit Zugriff auf das aufrufende Repository und der Berechtigung *Contents: Read and write* (*Metadata: Read-only* setzt GitHub automatisch). Alternativ ein Classic Token mit Scope `public_repo` bei öffentlichen oder `repo` bei privaten Repositories. Mehr braucht es nicht: `gh release view`, `--verify-tag`, das Erzeugen der Release-Notes und das Anlegen des Releases fallen alle unter *Contents*. Ein Fine-grained Token gehört genau einem Konto oder einer Organisation; liegt das aufrufende Repository in einer Organisation, muss das Token dort angelegt und von der Organisation zugelassen sein.
 - **Keine Autorisierungsprüfung:** Anders als `deployment.yml` prüft der Workflow nicht gegen `ADMIN_USERS`. Wer einen Tag pushen kann, hat im Repository ohnehin Schreibrecht; hängt der Job wie im Beispiel über `needs` am Deploy, entsteht ein Release außerdem nur nach einem Deploy, der diese Prüfung bestanden hat.
 - **Wiederholbar:** Existiert das Release bereits, endet der Schritt erfolgreich ohne Änderung. Ein erneuter Lauf der aufrufenden Pipeline scheitert dadurch nicht am Release des ersten Laufs.
 - **Kein neuer Tag:** `--verify-tag` bricht ab, wenn der Tag im Repository nicht existiert, statt ihn anzulegen.
