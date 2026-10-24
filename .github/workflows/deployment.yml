@@ -94,7 +94,7 @@ jobs:
           password: ${{ secrets.NAS_SSH_KEY }}
           script: |
             cd "${{ inputs.repo_path }}"
-            /opt/bin/git pull
+            /bin/git pull
 
   stop-compose-containers:
     if: >-
